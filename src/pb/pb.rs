@@ -48,3 +48,7 @@ pub mod sf {
         }
     }
 }
+
+pub mod uniswap_types_v1 {
+    include!("uniswap.types.v1.rs");  // Include the uniswap.types.v1.rs file
+}
