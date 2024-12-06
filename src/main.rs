@@ -12,11 +12,14 @@ use std::{env, process::exit, sync::Arc};
 use substreams::SubstreamsEndpoint;
 use substreams_stream::{BlockResponse, SubstreamsStream};
 
-use pb::uniswap_types_v1::Pools;
+// use pb::uniswap_types_v1::Pools;
+use module_map::MODULES;
 
-mod pb;
+pub mod pb;
+// mod pb;
 mod substreams;
 mod substreams_stream;
+mod module_map; 
 
 lazy_static! {
     static ref MODULE_NAME_REGEXP: Regex = Regex::new(r"^([a-zA-Z][a-zA-Z0-9_-]{0,63})$").unwrap();
@@ -28,13 +31,12 @@ const REGISTRY_URL: &str = "https://spkg.io";
 async fn main() -> Result<(), Error> {
     let args = env::args();
     if args.len() < 4 || args.len() > 5 {
-        println!("usage: stream <endpoint> <spkg> <module> [<start>:<stop>]");
-        println!();
-        println!("<spkg> can either be the full spkg.io link or `spkg_package@version`");
-        println!("Example usage: stream mainnet.injective.streamingfast.io:443 injective-common@v0.2.3 all_events 1:10");
-
-        println!("The environment variable SUBSTREAMS_API_TOKEN must be set also");
-        println!("and should contain a valid Substream API token.");
+        println!("command format: <stream endpoint> <spkg> <module> <start>:<stop>\n");
+        println!("Ensure the environment variable SUBSTREAMS_API_TOKEN is set with a valid Substream API token.\n");
+        println!("<spkg> can either be the full spkg.io link or `spkg_package@version`\n");
+        println!("Example usage: stream mainnet.injective.streamingfast.io:443 injective-common@v0.2.3 all_events 1:10\n");
+        // println!("The environment variable SUBSTREAMS_API_TOKEN must be set also");
+        // println!("and should contain a valid Substream API token.");
         exit(1);
     }
 
@@ -46,15 +48,21 @@ async fn main() -> Result<(), Error> {
         endpoint_url = format!("{}://{}", "https", endpoint_url);
     }
 
-    let token_env = env::var("SUBSTREAMS_API_TOKEN").unwrap_or("".to_string());
-    let mut token: Option<String> = None;
-    if token_env.len() > 0 {
-        token = Some(token_env);
-    }
+    // let token_env = env::var("SUBSTREAMS_API_TOKEN").unwrap_or("".to_string());
+    // let mut token: Option<String> = None;
+    // if token_env.len() > 0 {
+    //     token = Some(token_env);
+    //     }
+    let token = env::var("SUBSTREAMS_API_TOKEN")
+        .context("The environment variable SUBSTREAMS_API_TOKEN is not set\n
+                  Set using export SUBSTREAMS_API_TOKEN= 'eyJhbGciOiJL....  '\n")?;
+
 
     let package = read_package(&package_file).await?;
     let block_range = read_block_range(&package, &module_name)?;
-    let endpoint = Arc::new(SubstreamsEndpoint::new(&endpoint_url, token).await?);
+    // let endpoint = Arc::new(SubstreamsEndpoint::new(&endpoint_url, token).await?);
+    let endpoint = Arc::new(SubstreamsEndpoint::new(&endpoint_url, Some(token)).await?);
+
 
     let cursor: Option<String> = load_persisted_cursor()?;
 
@@ -74,7 +82,7 @@ async fn main() -> Result<(), Error> {
                 break;
             }
             Some(Ok(BlockResponse::New(data))) => {
-                process_block_scoped_data(&data)?;
+                process_block_scoped_data(&data,&module_name)?;
                 persist_cursor(data.cursor)?;
             }
             Some(Ok(BlockResponse::Undo(undo_signal))) => {
@@ -89,18 +97,26 @@ async fn main() -> Result<(), Error> {
             }
         }
     }
-
     Ok(())
 }
 
-fn process_block_scoped_data(data: &BlockScopedData) -> Result<(), Error> {
+fn process_block_scoped_data(data: &BlockScopedData, module_name: &str) -> Result<(), Error> {
     let output = data.output.as_ref().unwrap().map_output.as_ref().unwrap();
 
     // You can decode the actual Any type received using this code:
     //
     // let vas = output.value.as_slice();
     // println!("value {:?}", vas);
-    let value = Pools::decode(output.value.as_slice())?;
+
+    // let value = Pools::decode(output.value.as_slice())?;
+
+    // Get the decoder for the module
+    let decoder = MODULES
+        .get(module_name)
+        .ok_or_else(|| anyhow::anyhow!("Unknown module: {}", module_name))?;
+
+    let value = decoder(output.value.as_slice())?;
+    
     //
     // Where GeneratedStructName is the Rust code generated for the Protobuf representing
     // your type, so you will need generate it using `substreams protogen` and import it from the
@@ -114,6 +130,7 @@ fn process_block_scoped_data(data: &BlockScopedData) -> Result<(), Error> {
 
     if output.value.len() > 0 {
         println!("value: {:?}", value);  // For Debug output
+        
         println!("Block #{} - Payload {} ({} bytes) - Drift {}s",
             clock.number,
             output.type_url.replace("type.googleapis.com/", ""),
