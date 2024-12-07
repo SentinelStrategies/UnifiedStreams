@@ -52,3 +52,7 @@ pub mod sf {
 pub mod uniswap_types_v1 {
     include!("uniswap.types.v1.rs");  // Include the uniswap.types.v1.rs file
 }
+
+pub mod substreams_entity_change {
+    include!("sf.substreams.entity.v1.rs");  // Include the uniswap.types.v1.rs file
+}

@@ -5,6 +5,9 @@ use std::sync::Arc;
 use lazy_static::lazy_static;
 use anyhow::Error;
 
+// use substreams_entity_change::pb::entity::EntityChanges;
+// use pb::substreams_entity_change::EntityChanges;
+
 // Define a type alias for the decoder function
 type DecoderFn = Arc<dyn Fn(&[u8]) -> Result<Box<dyn std::fmt::Debug>, Error> + Sync + Send>;
 
@@ -30,18 +33,27 @@ lazy_static! {
         map.insert(
             "graph_out",
             Arc::new(|data: &[u8]| -> Result<Box<dyn std::fmt::Debug>, Error> {
-                let decoded = pb::uniswap_types_v1::Events::decode(data)?; // Decode the Protobuf data
+                let decoded = pb::substreams_entity_change::EntityChanges::decode(data)?; // Decode the Protobuf data
                 Ok(Box::new(decoded))
             }) as DecoderFn,
         );
         map.insert(
             "uni_v0_2_9:graph_out",
             Arc::new(|data: &[u8]| -> Result<Box<dyn std::fmt::Debug>, Error> {
-                let decoded = pb::uniswap_types_v1::Events::decode(data)?; // Decode the Protobuf data
+                let decoded = pb::substreams_entity_change::EntityChanges::decode(data)?; // Decode the Protobuf data
                 Ok(Box::new(decoded))
             }) as DecoderFn,
         );
         
+        map.insert(
+            "uni_v0_2_9:map_tokens_whitelist_pools",
+            Arc::new(|data: &[u8]| -> Result<Box<dyn std::fmt::Debug>, Error> {
+                let decoded = pb::uniswap_types_v1::Erc20Tokens::decode(data)?; // Decode the Protobuf data
+                Ok(Box::new(decoded))
+            }) as DecoderFn,
+        );
+
+
         // map.insert(
         //     "another_module_event",
         //     Arc::new(|data: &[u8]| -> Result<Box<dyn std::fmt::Debug>, Error> {

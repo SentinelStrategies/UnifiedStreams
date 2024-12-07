@@ -122,23 +122,23 @@ fn process_block_scoped_data(data: &BlockScopedData, module_name: &str) -> Resul
     // your type, so you will need generate it using `substreams protogen` and import it from the
     // `src/pb` folder.
 
-    let clock = data.clock.as_ref().unwrap();
-    let timestamp = clock.timestamp.as_ref().unwrap();
-    let date = DateTime::from_timestamp(timestamp.seconds, timestamp.nanos as u32)
-        .expect("received timestamp should always be valid");
+    // let clock = data.clock.as_ref().unwrap();
+    // let timestamp = clock.timestamp.as_ref().unwrap();
+    // let date = DateTime::from_timestamp(timestamp.seconds, timestamp.nanos as u32)
+    //     .expect("received timestamp should always be valid");
 
 
     if output.value.len() > 0 {
-        println!("value: {:?}", value);  // For Debug output
-        
-        println!("Block #{} - Payload {} ({} bytes) - Drift {}s",
-            clock.number,
-            output.type_url.replace("type.googleapis.com/", ""),
-            output.value.len(),
-            date.signed_duration_since(chrono::offset::Utc::now())
-                .num_seconds()
-                * -1
-        );
+        println!("{:?}", value);  // For Debug output
+        println!();
+        // println!("Block #{} - Payload {} ({} bytes) - Drift {}s",
+        //     clock.number,
+        //     output.type_url.replace("type.googleapis.com/", ""),
+        //     output.value.len(),
+        //     date.signed_duration_since(chrono::offset::Utc::now())
+        //         .num_seconds()
+        //         * -1
+        // );
     }   
 
     Ok(())
