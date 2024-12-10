@@ -1,5 +1,5 @@
 use anyhow::{format_err, Context, Error};
-use chrono::DateTime;
+// use chrono::DateTime;
 use futures03::StreamExt;
 use lazy_static::lazy_static;
 use pb::sf::substreams::rpc::v2::{BlockScopedData, BlockUndoSignal};
@@ -8,7 +8,7 @@ use regex::Regex;
 use semver::Version;
 
 use prost::Message;
-use std::{env, process::exit, sync::Arc};
+use std::{env,  sync::Arc};
 use substreams::SubstreamsEndpoint;
 use substreams_stream::{BlockResponse, SubstreamsStream};
 
@@ -29,53 +29,25 @@ const REGISTRY_URL: &str = "https://spkg.io";
 
 // Refactored into lib.rs
 pub async fn run_substream(
-    // endpoint_url: &str,
-    mut endpoint_url: String, // Take ownership of the String
+    endpoint_url: String,
     package_file: &str,
     module_name: &str,
     range: Option<String>,
-) -> Result<(), Error> {
+) -> Result<Vec<Box<dyn std::fmt::Debug>>, Error> {
+    
+    let endpoint_url = if endpoint_url.starts_with("http") {
+        endpoint_url
+    } else {
+        format!("https://{}", endpoint_url)
+    };
 
-    // if args.len() < 4 || args.len() > 5 {
-    //     return Err(anyhow!("Invalid arguments..."));
-    // }    
-    // let args = env::args();
-    // if args.len() < 4 || args.len() > 5 {
-    //     println!("command format: <stream endpoint> <spkg> <module> <start>:<stop>\n");
-    //     println!("Ensure the environment variable SUBSTREAMS_API_TOKEN is set with a valid Substream API token.\n");
-    //     println!("<spkg> can either be the full spkg.io link or `spkg_package@version`\n");
-    //     println!("Example usage: stream mainnet.injective.streamingfast.io:443 injective-common@v0.2.3 all_events 1:10\n");
-    //     // println!("The environment variable SUBSTREAMS_API_TOKEN must be set also");
-    //     // println!("and should contain a valid Substream API token.");
-    //     exit(1);
-    // }
-
-    // let mut endpoint_url = env::args().nth(1).unwrap();
-    // let package_file = env::args().nth(2).unwrap();
-    // let module_name = env::args().nth(3).unwrap();
-
-    if !endpoint_url.starts_with("http") {
-        endpoint_url = format!("{}://{}", "https", endpoint_url);
-    }
-
-    // let token_env = env::var("SUBSTREAMS_API_TOKEN").unwrap_or("".to_string());
-    // let mut token: Option<String> = None;
-    // if token_env.len() > 0 {
-    //     token = Some(token_env);
-    //     }
     let token = env::var("SUBSTREAMS_API_TOKEN")
-        .context("The environment variable SUBSTREAMS_API_TOKEN is not set\n
-                  Set using export SUBSTREAMS_API_TOKEN= 'eyJhbGciOiJL....  '\n")?;
+        .context("The environment variable SUBSTREAMS_API_TOKEN is not set")?;
 
-
-    let package = read_package(&package_file).await?;
-    let block_range = read_block_range(&package, &module_name, range.as_deref())?;
-    // let endpoint = Arc::new(SubstreamsEndpoint::new(&endpoint_url, token).await?);
+    let package = read_package(package_file).await?;
+    let block_range = read_block_range(&package, module_name, range.as_deref())?;
     let endpoint = Arc::new(SubstreamsEndpoint::new(&endpoint_url, Some(token)).await?);
-
-
     let cursor: Option<String> = load_persisted_cursor()?;
-
     let mut stream = SubstreamsStream::new(
         endpoint,
         cursor,
@@ -85,32 +57,29 @@ pub async fn run_substream(
         block_range.1,
     );
 
-    loop {
-        match stream.next().await {
-            None => {
-                // println!("Stream consumed");
-                // break;
-                return Ok(());
-            }
-            Some(Ok(BlockResponse::New(data))) => {
-                process_block_scoped_data(&data,&module_name)?;
+    let mut results = Vec::new();
+
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(BlockResponse::New(data)) => {
+                let decoded_data = process_block_scoped_data(&data, &module_name)?;
+                results.push(decoded_data);
                 persist_cursor(data.cursor)?;
             }
-            Some(Ok(BlockResponse::Undo(undo_signal))) => {
+            Ok(BlockResponse::Undo(undo_signal)) => {
                 process_block_undo_signal(&undo_signal)?;
                 persist_cursor(undo_signal.last_valid_cursor)?;
             }
-            Some(Err(err)) => {
-                // println!();
-                // println!("Stream terminated with error");
-                // println!("{:?}", err);
-                // exit(1);
+            Err(err) => {
                 return Err(anyhow::anyhow!("Stream terminated with error: {:?}", err));
             }
         }
     }
-    Ok(())
+    
+    // Return collected results when the stream ends
+    Ok(results)
 }
+
 
 // fn process_block_scoped_data(data: &BlockScopedData, module_name: &str) -> Result<(), Error> {
 // fn process_block_scoped_data(data: &BlockScopedData, module_name: &str) -> Result<Box<dyn std::fmt::Debug>, Error> {
@@ -164,7 +133,7 @@ pub async fn run_substream(
 fn process_block_scoped_data(
     data: &BlockScopedData,
     module_name: &str,
-) -> Result<Option<Box<dyn std::fmt::Debug>>, Error> {
+) -> Result<Box<dyn std::fmt::Debug>, Error> {
     let output = data.output.as_ref().unwrap().map_output.as_ref().unwrap();
 
     // Get the decoder for the module
@@ -173,12 +142,13 @@ fn process_block_scoped_data(
         .ok_or_else(|| anyhow::anyhow!("Unknown module: {}", module_name))?;
 
     if output.value.is_empty() {
-        // No data to decode
-        return Ok(None);
+        return Err(anyhow::anyhow!("No data to decode"));
     }
 
-    let value = decoder(output.value.as_slice())?;
-    Ok(Some(value)) // Return the decoded value wrapped in `Some`
+    // Decode the value
+    let decoded_value = decoder(output.value.as_slice())?;
+
+    Ok(decoded_value)
 }
 
 
