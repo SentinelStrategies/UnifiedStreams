@@ -16,10 +16,10 @@ use substreams_stream::{BlockResponse, SubstreamsStream};
 use module_map::MODULES;
 
 pub mod pb;
-// mod pb;
-mod substreams;
-mod substreams_stream;
-mod module_map; 
+pub mod module_map;
+pub mod substreams;
+pub mod substreams_stream;
+
 
 lazy_static! {
     static ref MODULE_NAME_REGEXP: Regex = Regex::new(r"^([a-zA-Z][a-zA-Z0-9_-]{0,63})$").unwrap();
@@ -27,22 +27,32 @@ lazy_static! {
 
 const REGISTRY_URL: &str = "https://spkg.io";
 
-#[tokio::main]
-async fn main() -> Result<(), Error> {
-    let args = env::args();
-    if args.len() < 4 || args.len() > 5 {
-        println!("command format: <stream endpoint> <spkg> <module> <start>:<stop>\n");
-        println!("Ensure the environment variable SUBSTREAMS_API_TOKEN is set with a valid Substream API token.\n");
-        println!("<spkg> can either be the full spkg.io link or `spkg_package@version`\n");
-        println!("Example usage: stream mainnet.injective.streamingfast.io:443 injective-common@v0.2.3 all_events 1:10\n");
-        // println!("The environment variable SUBSTREAMS_API_TOKEN must be set also");
-        // println!("and should contain a valid Substream API token.");
-        exit(1);
-    }
+// Refactored into lib.rs
+pub async fn run_substream(
+    // endpoint_url: &str,
+    mut endpoint_url: String, // Take ownership of the String
+    package_file: &str,
+    module_name: &str,
+    range: Option<String>,
+) -> Result<(), Error> {
 
-    let mut endpoint_url = env::args().nth(1).unwrap();
-    let package_file = env::args().nth(2).unwrap();
-    let module_name = env::args().nth(3).unwrap();
+    // if args.len() < 4 || args.len() > 5 {
+    //     return Err(anyhow!("Invalid arguments..."));
+    // }    
+    // let args = env::args();
+    // if args.len() < 4 || args.len() > 5 {
+    //     println!("command format: <stream endpoint> <spkg> <module> <start>:<stop>\n");
+    //     println!("Ensure the environment variable SUBSTREAMS_API_TOKEN is set with a valid Substream API token.\n");
+    //     println!("<spkg> can either be the full spkg.io link or `spkg_package@version`\n");
+    //     println!("Example usage: stream mainnet.injective.streamingfast.io:443 injective-common@v0.2.3 all_events 1:10\n");
+    //     // println!("The environment variable SUBSTREAMS_API_TOKEN must be set also");
+    //     // println!("and should contain a valid Substream API token.");
+    //     exit(1);
+    // }
+
+    // let mut endpoint_url = env::args().nth(1).unwrap();
+    // let package_file = env::args().nth(2).unwrap();
+    // let module_name = env::args().nth(3).unwrap();
 
     if !endpoint_url.starts_with("http") {
         endpoint_url = format!("{}://{}", "https", endpoint_url);
@@ -59,7 +69,7 @@ async fn main() -> Result<(), Error> {
 
 
     let package = read_package(&package_file).await?;
-    let block_range = read_block_range(&package, &module_name)?;
+    let block_range = read_block_range(&package, &module_name, range.as_deref())?;
     // let endpoint = Arc::new(SubstreamsEndpoint::new(&endpoint_url, token).await?);
     let endpoint = Arc::new(SubstreamsEndpoint::new(&endpoint_url, Some(token)).await?);
 
@@ -78,8 +88,9 @@ async fn main() -> Result<(), Error> {
     loop {
         match stream.next().await {
             None => {
-                println!("Stream consumed");
-                break;
+                // println!("Stream consumed");
+                // break;
+                return Ok(());
             }
             Some(Ok(BlockResponse::New(data))) => {
                 process_block_scoped_data(&data,&module_name)?;
@@ -90,59 +101,86 @@ async fn main() -> Result<(), Error> {
                 persist_cursor(undo_signal.last_valid_cursor)?;
             }
             Some(Err(err)) => {
-                println!();
-                println!("Stream terminated with error");
-                println!("{:?}", err);
-                exit(1);
+                // println!();
+                // println!("Stream terminated with error");
+                // println!("{:?}", err);
+                // exit(1);
+                return Err(anyhow::anyhow!("Stream terminated with error: {:?}", err));
             }
         }
     }
     Ok(())
 }
 
-fn process_block_scoped_data(data: &BlockScopedData, module_name: &str) -> Result<(), Error> {
+// fn process_block_scoped_data(data: &BlockScopedData, module_name: &str) -> Result<(), Error> {
+// fn process_block_scoped_data(data: &BlockScopedData, module_name: &str) -> Result<Box<dyn std::fmt::Debug>, Error> {
+
+//     let output = data.output.as_ref().unwrap().map_output.as_ref().unwrap();
+
+//     // You can decode the actual Any type received using this code:
+//     //
+//     // let vas = output.value.as_slice();
+//     // println!("value {:?}", vas);
+
+//     // let value = Pools::decode(output.value.as_slice())?;
+
+//     // Get the decoder for the module
+//     let decoder = MODULES
+//         .get(module_name)
+//         .ok_or_else(|| anyhow::anyhow!("Unknown module: {}", module_name))?;
+
+//     let value = decoder(output.value.as_slice())?;
+    
+//     //
+//     // Where GeneratedStructName is the Rust code generated for the Protobuf representing
+//     // your type, so you will need generate it using `substreams protogen` and import it from the
+//     // `src/pb` folder.
+
+//     // let clock = data.clock.as_ref().unwrap();
+//     // let timestamp = clock.timestamp.as_ref().unwrap();
+//     // let date = DateTime::from_timestamp(timestamp.seconds, timestamp.nanos as u32)
+//     //     .expect("received timestamp should always be valid");
+
+
+//     if output.value.len() > 0 {
+//         // println!("{:?}", value);  // For Debug output
+//         // println!();
+//         return Ok(value); // Return the decoded value
+//         // println!("Block #{} - Payload {} ({} bytes) - Drift {}s",
+//         //     clock.number,
+//         //     output.type_url.replace("type.googleapis.com/", ""),
+//         //     output.value.len(),
+//         //     date.signed_duration_since(chrono::offset::Utc::now())
+//         //         .num_seconds()
+//         //         * -1
+//         // );
+//     }   
+
+//     // Ok(())
+//     // Ok(Box::new(None))
+//     Ok(Box::new(None::<T>))
+// }
+
+fn process_block_scoped_data(
+    data: &BlockScopedData,
+    module_name: &str,
+) -> Result<Option<Box<dyn std::fmt::Debug>>, Error> {
     let output = data.output.as_ref().unwrap().map_output.as_ref().unwrap();
-
-    // You can decode the actual Any type received using this code:
-    //
-    // let vas = output.value.as_slice();
-    // println!("value {:?}", vas);
-
-    // let value = Pools::decode(output.value.as_slice())?;
 
     // Get the decoder for the module
     let decoder = MODULES
         .get(module_name)
         .ok_or_else(|| anyhow::anyhow!("Unknown module: {}", module_name))?;
 
+    if output.value.is_empty() {
+        // No data to decode
+        return Ok(None);
+    }
+
     let value = decoder(output.value.as_slice())?;
-    
-    //
-    // Where GeneratedStructName is the Rust code generated for the Protobuf representing
-    // your type, so you will need generate it using `substreams protogen` and import it from the
-    // `src/pb` folder.
-
-    // let clock = data.clock.as_ref().unwrap();
-    // let timestamp = clock.timestamp.as_ref().unwrap();
-    // let date = DateTime::from_timestamp(timestamp.seconds, timestamp.nanos as u32)
-    //     .expect("received timestamp should always be valid");
-
-
-    if output.value.len() > 0 {
-        println!("{:?}", value);  // For Debug output
-        println!();
-        // println!("Block #{} - Payload {} ({} bytes) - Drift {}s",
-        //     clock.number,
-        //     output.type_url.replace("type.googleapis.com/", ""),
-        //     output.value.len(),
-        //     date.signed_duration_since(chrono::offset::Utc::now())
-        //         .num_seconds()
-        //         * -1
-        // );
-    }   
-
-    Ok(())
+    Ok(Some(value)) // Return the decoded value wrapped in `Some`
 }
+
 
 fn process_block_undo_signal(_undo_signal: &BlockUndoSignal) -> Result<(), anyhow::Error> {
     // `BlockUndoSignal` must be treated as "delete every data that has been recorded after
@@ -173,7 +211,11 @@ fn load_persisted_cursor() -> Result<Option<String>, anyhow::Error> {
     Ok(None)
 }
 
-fn read_block_range(pkg: &Package, module_name: &str) -> Result<(i64, u64), anyhow::Error> {
+fn read_block_range(
+    pkg: &Package,
+    module_name: &str,
+    range: Option<&str>,
+) -> Result<(i64, u64), anyhow::Error> {
     let module = pkg
         .modules
         .as_ref()
@@ -183,10 +225,7 @@ fn read_block_range(pkg: &Package, module_name: &str) -> Result<(i64, u64), anyh
         .find(|m| m.name == module_name)
         .ok_or_else(|| format_err!("module '{}' not found in package", module_name))?;
 
-    let mut input: String = "".to_string();
-    if let Some(range) = env::args().nth(4) {
-        input = range;
-    };
+    let input: String = range.unwrap_or("").to_string();
 
     let (prefix, suffix) = match input.split_once(":") {
         Some((prefix, suffix)) => (prefix.to_string(), suffix.to_string()),
@@ -199,7 +238,7 @@ fn read_block_range(pkg: &Package, module_name: &str) -> Result<(i64, u64), anyh
             let block_count = x
                 .trim_start_matches("+")
                 .parse::<u64>()
-                .context("argument <stop> is not a valid integer")?;
+                .context("argument <start> is not a valid integer")?;
 
             (module.initial_block + block_count) as i64
         }
@@ -224,8 +263,9 @@ fn read_block_range(pkg: &Package, module_name: &str) -> Result<(i64, u64), anyh
             .context("argument <stop> is not a valid integer")?,
     };
 
-    return Ok((start, stop));
+    Ok((start, stop))
 }
+
 
 async fn read_package(input: &str) -> Result<Package, anyhow::Error> {
     let mut mutable_input = input.to_string();
