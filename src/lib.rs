@@ -34,7 +34,6 @@ pub async fn run_substream(
     module_name: &str,
     range: Option<String>,
 ) -> Result<Vec<Box<dyn std::fmt::Debug>>, Error> {
-    
     let endpoint_url = if endpoint_url.starts_with("http") {
         endpoint_url
     } else {
@@ -62,8 +61,17 @@ pub async fn run_substream(
     while let Some(result) = stream.next().await {
         match result {
             Ok(BlockResponse::New(data)) => {
-                let decoded_data = process_block_scoped_data(&data, &module_name)?;
-                results.push(decoded_data);
+                match process_block_scoped_data(&data, &module_name) {
+                    Ok(decoded_data) => results.push(decoded_data),
+                    Err(err) => {
+                        if err.to_string() == "Empty block data" {
+                            // Skip empty blocks
+                            continue;
+                        } else {
+                            return Err(err); // Propagate other errors
+                        }
+                    }
+                }
                 persist_cursor(data.cursor)?;
             }
             Ok(BlockResponse::Undo(undo_signal)) => {
@@ -75,60 +83,9 @@ pub async fn run_substream(
             }
         }
     }
-    
-    // Return collected results when the stream ends
+
     Ok(results)
 }
-
-
-// fn process_block_scoped_data(data: &BlockScopedData, module_name: &str) -> Result<(), Error> {
-// fn process_block_scoped_data(data: &BlockScopedData, module_name: &str) -> Result<Box<dyn std::fmt::Debug>, Error> {
-
-//     let output = data.output.as_ref().unwrap().map_output.as_ref().unwrap();
-
-//     // You can decode the actual Any type received using this code:
-//     //
-//     // let vas = output.value.as_slice();
-//     // println!("value {:?}", vas);
-
-//     // let value = Pools::decode(output.value.as_slice())?;
-
-//     // Get the decoder for the module
-//     let decoder = MODULES
-//         .get(module_name)
-//         .ok_or_else(|| anyhow::anyhow!("Unknown module: {}", module_name))?;
-
-//     let value = decoder(output.value.as_slice())?;
-    
-//     //
-//     // Where GeneratedStructName is the Rust code generated for the Protobuf representing
-//     // your type, so you will need generate it using `substreams protogen` and import it from the
-//     // `src/pb` folder.
-
-//     // let clock = data.clock.as_ref().unwrap();
-//     // let timestamp = clock.timestamp.as_ref().unwrap();
-//     // let date = DateTime::from_timestamp(timestamp.seconds, timestamp.nanos as u32)
-//     //     .expect("received timestamp should always be valid");
-
-
-//     if output.value.len() > 0 {
-//         // println!("{:?}", value);  // For Debug output
-//         // println!();
-//         return Ok(value); // Return the decoded value
-//         // println!("Block #{} - Payload {} ({} bytes) - Drift {}s",
-//         //     clock.number,
-//         //     output.type_url.replace("type.googleapis.com/", ""),
-//         //     output.value.len(),
-//         //     date.signed_duration_since(chrono::offset::Utc::now())
-//         //         .num_seconds()
-//         //         * -1
-//         // );
-//     }   
-
-//     // Ok(())
-//     // Ok(Box::new(None))
-//     Ok(Box::new(None::<T>))
-// }
 
 fn process_block_scoped_data(
     data: &BlockScopedData,
@@ -142,7 +99,8 @@ fn process_block_scoped_data(
         .ok_or_else(|| anyhow::anyhow!("Unknown module: {}", module_name))?;
 
     if output.value.is_empty() {
-        return Err(anyhow::anyhow!("No data to decode"));
+        // Return a specific error for empty blocks
+        return Err(anyhow::anyhow!("Empty block data"));
     }
 
     // Decode the value
