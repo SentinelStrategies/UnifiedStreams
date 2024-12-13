@@ -1,5 +1,5 @@
 use anyhow::{format_err, Context, Error};
-use chrono::DateTime;
+// use chrono::DateTime;
 use futures03::StreamExt;
 use lazy_static::lazy_static;
 use pb::sf::substreams::rpc::v2::{BlockScopedData, BlockUndoSignal};
@@ -37,19 +37,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
 
     // Check if the first argument is either "rpc_call" or "substreams_call"
-    if args.len() < 2 || (args[1] != "rpc_call" && args[1] != "substreams_call") {
-        eprintln!("Usage: cargo run <rpc_call|substreams_call> <other-arguments>");
+    if args.len() < 2 || (args[1] != "rpc_call" && args[1] != "substreams_call" && args[1] != "api_call")  {
+        eprintln!("\nArguments error follow one of the format below!\n
+                    Usage: cargo run api_call <api-url> [optional-headers]\n
+                    Usage: cargo run rpc_call <rpc-url> <method> <params> <id>\n
+                    Usage: cargo run substreams_call <stream endpoint> <spkg> <module> <start>:<stop>\n");
         return Ok(());
     }
 
     if args[1] == "rpc_call" {
-        if args.len() < 6 {
-            eprintln!("Error: Missing arguments. Usage: cargo run rpc_call <rpc-url> <method> <params> <id>");
-            return Ok(());
-        }
-
-        if args.len() > 6 {
-            eprintln!("Error: Too many arguments. Usage: cargo run rpc_call <rpc-url> <method> <params> <id>");
+        if args.len() != 6  {
+            eprintln!("Unknown rpc_call arguments. Usage: cargo run rpc_call <rpc-url> <method> <params> <id>");
             return Ok(());
         }
 
@@ -88,8 +86,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if args[1] == "substreams_call" {
-        if args.len() < 5 || args.len() > 6 {
-            println!("command format: <stream endpoint> <spkg> <module> <start>:<stop>\n");
+        if args.len() != 5 && args.len() != 6 {
+            println!("command format: cargo run substreams_call <stream endpoint> <spkg> <module> <start>:<stop>\n");
             println!("Ensure the environment variable SUBSTREAMS_API_TOKEN is set with a valid Substream API token.\n");
             println!("<spkg> can either be the full spkg.io link or `spkg_package@version`\n");
             println!("Example usage: stream mainnet.injective.streamingfast.io:443 injective-common@v0.2.3 all_events 1:10\n");
@@ -149,6 +147,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         return Ok(());
     }
+
+    if args[1] == "api_call"{
+
+        if args.len() != 3 && args.len() != 4  {
+            eprintln!("Usage: cargo run api_call <api-url> [optional-headers]");
+            return Ok(());
+        }
+
+        let api_url = &args[2];
+
+        // Optional headers (passed as JSON string)
+        // let optional_headers = args.get(3).unwrap_or(&"{}".to_string());
+        // let headers: Value = serde_json::from_str(optional_headers).unwrap_or(Value::Null);
+
+        let fallback_headers = "{}".to_string(); // Create a fallback string
+        let optional_headers = args.get(3).unwrap_or(&fallback_headers); // Use the fallback if no argument is provided
+        let headers: Value = serde_json::from_str(optional_headers).unwrap_or(Value::Null); // Parse headers JSON
+
+
+        // Create HTTP client
+        let client = Client::new();
+
+        // Create request with optional headers
+        let mut request = client.get(api_url);
+        if let Some(headers_map) = headers.as_object() {
+            for (key, value) in headers_map {
+                if let Some(header_value) = value.as_str() {
+                    request = request.header(key, header_value);
+                }
+            }
+        }
+
+        // Send request and handle response
+        let response = request.send().await?;
+        // let status = response.status();
+        let response_text = response.text().await?;
+
+        // println!("Status Code: {}", status);
+        println!("Response: {}", response_text);
+        }
 
     Ok(())
 }
