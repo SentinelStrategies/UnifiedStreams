@@ -21,6 +21,10 @@ mod substreams;
 mod substreams_stream;
 mod module_map; 
 
+use reqwest::Client;
+use serde_json::{json, Value};
+// use std::env;
+
 lazy_static! {
     static ref MODULE_NAME_REGEXP: Regex = Regex::new(r"^([a-zA-Z][a-zA-Z0-9_-]{0,63})$").unwrap();
 }
@@ -28,75 +32,124 @@ lazy_static! {
 const REGISTRY_URL: &str = "https://spkg.io";
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
-    let args = env::args();
-    if args.len() < 4 || args.len() > 5 {
-        println!("command format: <stream endpoint> <spkg> <module> <start>:<stop>\n");
-        println!("Ensure the environment variable SUBSTREAMS_API_TOKEN is set with a valid Substream API token.\n");
-        println!("<spkg> can either be the full spkg.io link or `spkg_package@version`\n");
-        println!("Example usage: stream mainnet.injective.streamingfast.io:443 injective-common@v0.2.3 all_events 1:10\n");
-        // println!("The environment variable SUBSTREAMS_API_TOKEN must be set also");
-        // println!("and should contain a valid Substream API token.");
-        exit(1);
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Collect command-line arguments
+    let args: Vec<String> = env::args().collect();
+
+    // Check if the first argument is either "rpc_call" or "substreams_call"
+    if args.len() < 2 || (args[1] != "rpc_call" && args[1] != "substreams_call") {
+        eprintln!("Usage: cargo run <rpc_call|substreams_call> <other-arguments>");
+        return Ok(());
     }
 
-    let mut endpoint_url = env::args().nth(1).unwrap();
-    let package_file = env::args().nth(2).unwrap();
-    let module_name = env::args().nth(3).unwrap();
+    if args[1] == "rpc_call" {
+        if args.len() < 6 {
+            eprintln!("Error: Missing arguments. Usage: cargo run rpc_call <rpc-url> <method> <params> <id>");
+            return Ok(());
+        }
 
-    if !endpoint_url.starts_with("http") {
-        endpoint_url = format!("{}://{}", "https", endpoint_url);
+        if args.len() > 6 {
+            eprintln!("Error: Too many arguments. Usage: cargo run rpc_call <rpc-url> <method> <params> <id>");
+            return Ok(());
+        }
+
+        // Extract arguments for rpc_call
+        let rpc_endpoint = &args[2];
+        let method = &args[3];
+        let params_input = &args[4];
+        let id: i32 = args[5].parse().expect("Invalid ID (must be a number).");
+
+        // Parse the parameters JSON
+        let params: Value = serde_json::from_str(params_input).expect("Invalid JSON for parameters.");
+
+        // Build the JSON-RPC request body
+        let request_body = json!({
+            "jsonrpc": "2.0",
+            "method": method,
+            "params": params,
+            "id": id
+        });
+
+        // Create an HTTP client
+        let client = Client::new();
+
+        // Send the POST request
+        let response = client
+            .post(rpc_endpoint)
+            .json(&request_body)
+            .send()
+            .await?;
+
+        // Parse and display the response
+        let response_json: Value = response.json().await?;
+        println!("Response: {}", serde_json::to_string_pretty(&response_json)?);
+
+        return Ok(());
     }
 
-    // let token_env = env::var("SUBSTREAMS_API_TOKEN").unwrap_or("".to_string());
-    // let mut token: Option<String> = None;
-    // if token_env.len() > 0 {
-    //     token = Some(token_env);
-    //     }
-    let token = env::var("SUBSTREAMS_API_TOKEN")
-        .context("The environment variable SUBSTREAMS_API_TOKEN is not set\n
-                  Set using export SUBSTREAMS_API_TOKEN= 'eyJhbGciOiJL....  '\n")?;
+    if args[1] == "substreams_call" {
+        if args.len() < 5 || args.len() > 6 {
+            println!("command format: <stream endpoint> <spkg> <module> <start>:<stop>\n");
+            println!("Ensure the environment variable SUBSTREAMS_API_TOKEN is set with a valid Substream API token.\n");
+            println!("<spkg> can either be the full spkg.io link or `spkg_package@version`\n");
+            println!("Example usage: stream mainnet.injective.streamingfast.io:443 injective-common@v0.2.3 all_events 1:10\n");
+            return Ok(());
+        }
 
+        let mut endpoint_url = args[2].clone();
+        let package_file = args[3].clone();
+        let module_name = args[4].clone();
+        // let block_range = args[5].clone();
 
-    let package = read_package(&package_file).await?;
-    let block_range = read_block_range(&package, &module_name)?;
-    // let endpoint = Arc::new(SubstreamsEndpoint::new(&endpoint_url, token).await?);
-    let endpoint = Arc::new(SubstreamsEndpoint::new(&endpoint_url, Some(token)).await?);
+        if !endpoint_url.starts_with("http") {
+            endpoint_url = format!("{}://{}", "https", endpoint_url);
+        }
 
+        let token = env::var("SUBSTREAMS_API_TOKEN")
+            .expect("The environment variable SUBSTREAMS_API_TOKEN is not set\n
+                      Set using export SUBSTREAMS_API_TOKEN='eyJhbGciOiJL....'\n");
 
-    let cursor: Option<String> = load_persisted_cursor()?;
+        let package = read_package(&package_file).await?;
+        let block_range = read_block_range(&package, &module_name)?;
 
-    let mut stream = SubstreamsStream::new(
-        endpoint,
-        cursor,
-        package.modules,
-        module_name.to_string(),
-        block_range.0,
-        block_range.1,
-    );
+        let endpoint = Arc::new(SubstreamsEndpoint::new(&endpoint_url, Some(token)).await?);
+        let cursor: Option<String> = load_persisted_cursor()?;
 
-    loop {
-        match stream.next().await {
-            None => {
-                println!("Stream consumed");
-                break;
-            }
-            Some(Ok(BlockResponse::New(data))) => {
-                process_block_scoped_data(&data,&module_name)?;
-                persist_cursor(data.cursor)?;
-            }
-            Some(Ok(BlockResponse::Undo(undo_signal))) => {
-                process_block_undo_signal(&undo_signal)?;
-                persist_cursor(undo_signal.last_valid_cursor)?;
-            }
-            Some(Err(err)) => {
-                println!();
-                println!("Stream terminated with error");
-                println!("{:?}", err);
-                exit(1);
+        let mut stream = SubstreamsStream::new(
+            endpoint,
+            cursor,
+            package.modules,
+            module_name.to_string(),
+            block_range.0,
+            block_range.1,
+        );
+
+        loop {
+            match stream.next().await {
+                None => {
+                    println!("Stream consumed");
+                    break;
+                }
+                Some(Ok(BlockResponse::New(data))) => {
+                    process_block_scoped_data(&data, &module_name)?;
+                    persist_cursor(data.cursor)?;
+                }
+                Some(Ok(BlockResponse::Undo(undo_signal))) => {
+                    process_block_undo_signal(&undo_signal)?;
+                    persist_cursor(undo_signal.last_valid_cursor)?;
+                }
+                Some(Err(err)) => {
+                    println!();
+                    println!("Stream terminated with error");
+                    println!("{:?}", err);
+                    exit(1);
+                }
             }
         }
+
+        return Ok(());
     }
+
     Ok(())
 }
 
@@ -184,7 +237,7 @@ fn read_block_range(pkg: &Package, module_name: &str) -> Result<(i64, u64), anyh
         .ok_or_else(|| format_err!("module '{}' not found in package", module_name))?;
 
     let mut input: String = "".to_string();
-    if let Some(range) = env::args().nth(4) {
+    if let Some(range) = env::args().nth(5) {
         input = range;
     };
 
