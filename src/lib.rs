@@ -20,6 +20,10 @@ pub mod module_map;
 pub mod substreams;
 pub mod substreams_stream;
 
+use reqwest::Client;
+use serde_json::{json, Value};
+// use std::error::Error;
+
 
 lazy_static! {
     static ref MODULE_NAME_REGEXP: Regex = Regex::new(r"^([a-zA-Z][a-zA-Z0-9_-]{0,63})$").unwrap();
@@ -86,6 +90,99 @@ pub async fn run_substream(
 
     Ok(results)
 }
+
+pub async fn rpc_call(
+    rpc_endpoint: &str,
+    method: &str,
+    params_input: &str,
+    id: i32,
+) -> Result<Value, anyhow::Error> {
+    // Ensure the endpoint starts with HTTP
+    let rpc_endpoint = if rpc_endpoint.starts_with("http") {
+        rpc_endpoint.to_string()
+    } else {
+        format!("https://{}", rpc_endpoint)
+    };
+
+    // Parse the parameters JSON
+    let params: Value = serde_json::from_str(params_input)
+        .context("Invalid JSON for parameters")?;
+
+    // Build the JSON-RPC request body
+    let request_body = json!({
+        "jsonrpc": "2.0",
+        "method": method,
+        "params": params,
+        "id": id
+    });
+
+    // Create an HTTP client
+    let client = Client::new();
+
+    // Send the POST request
+    let response = client
+        .post(&rpc_endpoint)
+        .json(&request_body)
+        .send()
+        .await
+        .context("Failed to send RPC call")?;
+
+    // Parse and return the response
+    let response_json: Value = response
+        .json()
+        .await
+        .context("Failed to parse RPC response")?;
+
+    Ok(response_json)
+}
+
+pub async fn api_call(
+    api_url: &str,
+    optional_headers: Option<&str>,
+) -> Result<String, anyhow::Error> {
+    // Ensure the API URL starts with HTTP
+    let api_url = if api_url.starts_with("http") {
+        api_url.to_string()
+    } else {
+        format!("https://{}", api_url)
+    };
+
+    // Parse optional headers JSON
+    let headers: Value = match optional_headers {
+        Some(headers_str) => serde_json::from_str(headers_str)
+            .context("Invalid JSON for headers")?,
+        None => json!({}),
+    };
+
+    // Create HTTP client
+    let client = Client::new();
+
+    // Create request with optional headers
+    let mut request = client.get(&api_url);
+    if let Some(headers_map) = headers.as_object() {
+        for (key, value) in headers_map {
+            if let Some(header_value) = value.as_str() {
+                request = request.header(key, header_value);
+            }
+        }
+    }
+
+    // Send the GET request
+    let response = request
+        .send()
+        .await
+        .context("Failed to send API call")?;
+
+    // Parse and return the response text
+    let response_text = response
+        .text()
+        .await
+        .context("Failed to read API response")?;
+
+    Ok(response_text)
+}
+
+
 
 fn process_block_scoped_data(
     data: &BlockScopedData,
