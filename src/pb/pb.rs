@@ -56,3 +56,27 @@ pub mod uniswap_types_v1 {
 pub mod substreams_entity_change {
     include!("sf.substreams.entity.v1.rs");  // Include the uniswap.types.v1.rs file
 }
+
+pub mod solana_types_v1 {
+    include!("sf.solana.type.v1.rs");
+}
+
+pub mod sol_block_v1{
+    include!("sol.block.v1.rs");
+}
+
+pub mod sol_transactions_v1{
+    include!("sol.transactions.v1.rs");
+}
+
+pub mod eth_block_meta_v1{
+    include!("eth.block_meta.v1.rs");
+}
+
+pub mod eth_event_v1_rs{
+    include!("eth.event.v1.rs");
+}
+
+pub mod eth_transaction_v1{
+    include!("eth.transaction.v1.rs");
+}
