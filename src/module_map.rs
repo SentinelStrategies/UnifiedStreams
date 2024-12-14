@@ -53,6 +53,45 @@ lazy_static! {
             }) as DecoderFn,
         );
 
+        map.insert(
+            "map_block_full",
+            Arc::new(|data: &[u8]| -> Result<Box<dyn std::fmt::Debug>, Error> {
+                let decoded = pb::solana_types_v1::Block::decode(data)?; // Decode the Protobuf data
+                Ok(Box::new(decoded))
+            }) as DecoderFn,
+        );
+
+        map.insert(
+            "map_block_without_votes",
+            Arc::new(|data: &[u8]| -> Result<Box<dyn std::fmt::Debug>, Error> {
+                let decoded = pb::solana_types_v1::Block::decode(data)?; // Decode the Protobuf data
+                Ok(Box::new(decoded))
+            }) as DecoderFn,
+        );
+
+        map.insert(
+            "map_block_meta",
+            Arc::new(|data: &[u8]| -> Result<Box<dyn std::fmt::Debug>, Error> {
+                let decoded = pb::sol_block_v1::BlockMeta::decode(data)?; // Decode the Protobuf data
+                Ok(Box::new(decoded))
+            }) as DecoderFn,
+        );
+
+        map.insert(
+            "map_filter_instructions",
+            Arc::new(|data: &[u8]| -> Result<Box<dyn std::fmt::Debug>, Error> {
+                let decoded = pb::sol_transactions_v1::Instructions::decode(data)?; // Decode the Protobuf data
+                Ok(Box::new(decoded))
+            }) as DecoderFn,
+        );
+
+        map.insert(
+            "map_filter_transactions",
+            Arc::new(|data: &[u8]| -> Result<Box<dyn std::fmt::Debug>, Error> {
+                let decoded = pb::sol_transactions_v1::Transactions::decode(data)?; // Decode the Protobuf data
+                Ok(Box::new(decoded))
+            }) as DecoderFn,
+        );
 
         // map.insert(
         //     "another_module_event",
