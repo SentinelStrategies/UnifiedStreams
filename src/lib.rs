@@ -24,6 +24,8 @@ use reqwest::Client;
 use serde_json::{json, Value};
 // use std::error::Error;
 
+mod ffi;
+pub use ffi::*; // Re-export FFI functions
 
 lazy_static! {
     static ref MODULE_NAME_REGEXP: Regex = Regex::new(r"^([a-zA-Z][a-zA-Z0-9_-]{0,63})$").unwrap();
