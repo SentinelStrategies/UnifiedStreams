@@ -56,20 +56,19 @@ You need to install OpenSSL (and pkg-config) so that Rust can link the necessary
 # 4. Usage
 
    Usage1: cargo run api_call <api-url> [optional-headers]
-
 **Example:**
 ```bash 
 cargo run api_call https://httpbin.org/get
-
+```
 
    Usage2: cargo run rpc_call <rpc-url> <method> <params> <id>
-
 **Example:**
 ```bash
 cargo run rpc_call https://mainnet.infura.io/v3/e2df7af7a38e41d9a7334ce930e566c9 eth_getBalance '["0x3843889b7356e89e63581A594ad826B1F1C445f5", "latest"]' 1 
-
+```
 
    Usage3: cargo run substreams_call <stream endpoint> <spkg> <module> <start>:<stop>
 **Example:**
 ```bash
 cargo run substreams_call https://mainnet.eth.streamingfast.io:443 https://github.com/streamingfast/substreams-uniswap-v3/releases/download/v0.2.10/substreams-uniswap-v3-v0.2.10.spkg uni_v0_2_9:map_tokens_whitelist_pools 21333100:21335101
+```
