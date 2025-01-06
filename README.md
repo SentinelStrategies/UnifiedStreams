@@ -41,35 +41,35 @@ You can set a JWT token as an environment variable to avoid specifying it for ea
 # 2. Install Rust and Cargo 
 After installing the Rust compiler (rustc) and the Rust package manager (cargo), verify their versions by running:
 
-         ```bash
-               rustc --version
-               cargo --version
-         ```
+```bash
+      rustc --version
+      cargo --version
+```
 
 # 3. Install OpenSSL and Related Dependencies
 You need to install OpenSSL (and pkg-config) so that Rust can link the necessary libraries during compilation:
 
-         ```bash 
-               pkg-config --libs --cflags openssl
-         ```
+```bash 
+      pkg-config --libs --cflags openssl
+```
 
 # 4. Usage
 
    Usage1: cargo run api_call <api-url> [optional-headers]
 
 **Example:**
-bash``` 
+```bash 
 cargo run api_call https://httpbin.org/get
 
 
    Usage2: cargo run rpc_call <rpc-url> <method> <params> <id>
 
 **Example:**
-bash```
+```bash
 cargo run rpc_call https://mainnet.infura.io/v3/e2df7af7a38e41d9a7334ce930e566c9 eth_getBalance '["0x3843889b7356e89e63581A594ad826B1F1C445f5", "latest"]' 1 
 
 
    Usage3: cargo run substreams_call <stream endpoint> <spkg> <module> <start>:<stop>
 **Example:**
-bash```
+```bash
 cargo run substreams_call https://mainnet.eth.streamingfast.io:443 https://github.com/streamingfast/substreams-uniswap-v3/releases/download/v0.2.10/substreams-uniswap-v3-v0.2.10.spkg uni_v0_2_9:map_tokens_whitelist_pools 21333100:21335101
