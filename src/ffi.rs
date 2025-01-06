@@ -4,6 +4,36 @@ use std::os::raw::c_char;
 use lazy_static::lazy_static;
 use tokio::runtime::Runtime;
 use crate::{rpc_call, api_call, run_substream};
+use std::ptr;
+
+pub struct FfiString {
+    ptr: *mut c_char,
+}
+
+impl FfiString {
+    // Create a new FfiString from a Rust string
+    pub fn new(s: String) -> Self {
+        let c_string = CString::new(s).unwrap();
+        let ptr = c_string.into_raw(); // Allocate memory
+        Self { ptr }
+    }
+
+    // Get the raw pointer
+    pub fn as_ptr(&self) -> *mut c_char {
+        self.ptr
+    }
+}
+
+// Free the pointer when no longer needed
+impl Drop for FfiString {
+    fn drop(&mut self) {
+        if !self.ptr.is_null() {
+            unsafe {
+                CString::from_raw(self.ptr); // Deallocate the memory
+            }
+        }
+    }
+}
 
 // Create a global tokio runtime
 lazy_static! {
@@ -18,7 +48,7 @@ pub extern "C" fn rpc_call_ffi(
     id: i32,
 ) -> *mut c_char {
     if rpc_endpoint.is_null() || method.is_null() || params_input.is_null() {
-        return CString::new("Null pointer passed").unwrap().into_raw();
+        return FfiString::new("Error: Null pointer passed".to_string()).as_ptr();
     }
 
     let rpc_endpoint = unsafe { CStr::from_ptr(rpc_endpoint).to_string_lossy().to_string() };
@@ -28,8 +58,16 @@ pub extern "C" fn rpc_call_ffi(
     let result = RUNTIME.block_on(rpc_call(&rpc_endpoint, &method, &params_input, id));
 
     match result {
-        Ok(value) => CString::new(value.to_string()).unwrap().into_raw(),
-        Err(err) => CString::new(format!("Error: {}", err)).unwrap().into_raw(),
+        Ok(value) => {
+            let ffi_string = FfiString::new(value.to_string());
+            println!("rpc_call_ffi: Allocated pointer {:?}", ffi_string.as_ptr());
+            ffi_string.as_ptr()
+        }
+        Err(err) => {
+            let ffi_string = FfiString::new(format!("Error: {}", err));
+            println!("rpc_call_ffi: Allocated error pointer {:?}", ffi_string.as_ptr());
+            ffi_string.as_ptr()
+        }
     }
 }
 
