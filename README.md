@@ -1,2 +1,10 @@
-# UnifiedStreams
-A robust library for integrating Substreams, RPC calls, and API calls into your applications. It simplifies real-time data processing, cross-protocol communication, and API integrations. Designed with extensibility, performance, and reliability in mind, it’s perfect for building scalable, multi-protocol systems.
+# UnifiedStreams (main branch)
+This "main" branch contains a powerful program for seamlessly integrating Substreams, RPC calls, and API calls into your workflows. It simplifies real-time data processing, enhances cross-protocol communication, and streamlines API interactions. Designed with a focus on performance, reliability, and scalability, this program is perfect for building robust, multi-protocol solutions.
+TO use portable library please refer of other branch "lib".
+
+# Setup a substreams JWT TOKEN as environment varibale
+         bash``
+               nano ~/.bashrc
+               export SF_API_TOKEN="jwt_token_here"
+               source ~/.bashrc
+
