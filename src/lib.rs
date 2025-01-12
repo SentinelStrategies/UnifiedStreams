@@ -12,11 +12,7 @@ use std::{env,  sync::Arc};
 use substreams::SubstreamsEndpoint;
 use substreams_stream::{BlockResponse, SubstreamsStream};
 
-// use pb::uniswap_types_v1::Pools;
-use module_map::MODULES;
-
 pub mod pb;
-pub mod module_map;
 pub mod substreams;
 pub mod substreams_stream;
 
@@ -34,7 +30,7 @@ lazy_static! {
 const REGISTRY_URL: &str = "https://spkg.io";
 
 // Refactored into lib.rs
-pub async fn run_substream(
+pub async fn substreams_call(
     endpoint_url: String,
     package_file: &str,
     module_name: &str,
@@ -67,7 +63,7 @@ pub async fn run_substream(
     while let Some(result) = stream.next().await {
         match result {
             Ok(BlockResponse::New(data)) => {
-                match process_block_scoped_data(&data, &module_name) {
+                match process_block_scoped_data(&data) {
                     Ok(decoded_data) => results.push(decoded_data),
                     Err(err) => {
                         if err.to_string() == "Empty block data" {
@@ -188,24 +184,15 @@ pub async fn api_call(
 
 fn process_block_scoped_data(
     data: &BlockScopedData,
-    module_name: &str,
 ) -> Result<Box<dyn std::fmt::Debug>, Error> {
     let output = data.output.as_ref().unwrap().map_output.as_ref().unwrap();
-
-    // Get the decoder for the module
-    let decoder = MODULES
-        .get(module_name)
-        .ok_or_else(|| anyhow::anyhow!("Unknown module: {}", module_name))?;
 
     if output.value.is_empty() {
         // Return a specific error for empty blocks
         return Err(anyhow::anyhow!("Empty block data"));
     }
 
-    // Decode the value
-    let decoded_value = decoder(output.value.as_slice())?;
-
-    Ok(decoded_value)
+    Ok(Box::new(output.value.clone()))
 }
 
 

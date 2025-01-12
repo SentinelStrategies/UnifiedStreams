@@ -3,8 +3,8 @@ use std::ffi::{CString, CStr};
 use std::os::raw::c_char;
 use lazy_static::lazy_static;
 use tokio::runtime::Runtime;
-use crate::{rpc_call, api_call, run_substream};
-use std::ptr;
+use crate::{rpc_call, api_call, substreams_call};
+// use std::ptr;
 
 pub struct FfiString {
     ptr: *mut c_char,
@@ -29,7 +29,7 @@ impl Drop for FfiString {
     fn drop(&mut self) {
         if !self.ptr.is_null() {
             unsafe {
-                CString::from_raw(self.ptr); // Deallocate the memory
+                let _ = CString::from_raw(self.ptr); // Deallocate the memory
             }
         }
     }
@@ -98,7 +98,7 @@ pub extern "C" fn api_call_ffi(
 }
 
 #[no_mangle]
-pub extern "C" fn run_substream_ffi(
+pub extern "C" fn substreams_call_ffi(
     endpoint_url: *const c_char,
     package_file: *const c_char,
     module_name: *const c_char,
@@ -119,7 +119,7 @@ pub extern "C" fn run_substream_ffi(
         }
     };
 
-    let result = RUNTIME.block_on(run_substream(endpoint_url, &package_file, &module_name, range));
+    let result = RUNTIME.block_on(substreams_call(endpoint_url, &package_file, &module_name, range));
 
     match result {
         Ok(debug_values) => {
@@ -138,6 +138,6 @@ pub extern "C" fn free_string(ptr: *mut c_char) {
     }
     unsafe {
         println!("free_string: Freeing pointer {:?}", ptr);
-        CString::from_raw(ptr); // Safely deallocates the memory
+        let _ = CString::from_raw(ptr); // Safely deallocates the memory
     }
 }
