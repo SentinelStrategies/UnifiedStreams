@@ -183,7 +183,6 @@ pub async fn api_call(
 
 fn process_block_scoped_data(
     data: &BlockScopedData,
-    _module_name: &str,
 ) -> Result<Vec<u8>, Error> {
     let output = data.output.as_ref().unwrap().map_output.as_ref().unwrap();
 

@@ -1,30 +1,45 @@
-
 use std::ffi::{CString, CStr};
 use std::os::raw::c_char;
 use lazy_static::lazy_static;
 use tokio::runtime::Runtime;
 use crate::{rpc_call, api_call, substreams_call};
-// use std::ptr;
 
+// Struct to represent raw byte array
+#[repr(C)]
+pub struct FfiByteArray {
+    pub data: *mut u8,   // Pointer to the raw byte array
+    pub length: usize,   // Length of the byte array
+}
+
+impl FfiByteArray {
+    pub fn new(bytes: Vec<u8>) -> Self {
+        let length = bytes.len();
+        let data = bytes.as_ptr() as *mut u8;
+
+        // Prevent Rust from freeing the memory
+        std::mem::forget(bytes);
+
+        Self { data, length }
+    }
+}
+
+// String wrapper for C compatibility
 pub struct FfiString {
     ptr: *mut c_char,
 }
 
 impl FfiString {
-    // Create a new FfiString from a Rust string
     pub fn new(s: String) -> Self {
         let c_string = CString::new(s).unwrap();
         let ptr = c_string.into_raw(); // Allocate memory
         Self { ptr }
     }
 
-    // Get the raw pointer
     pub fn as_ptr(&self) -> *mut c_char {
         self.ptr
     }
 }
 
-// Free the pointer when no longer needed
 impl Drop for FfiString {
     fn drop(&mut self) {
         if !self.ptr.is_null() {
@@ -35,18 +50,19 @@ impl Drop for FfiString {
     }
 }
 
-// Create a global tokio runtime
+// Global tokio runtime
 lazy_static! {
     static ref RUNTIME: Runtime = Runtime::new().unwrap();
 }
 
+// Substreams call for raw bytes
 #[no_mangle]
 pub extern "C" fn substreams_call_ffi(
     endpoint_url: *const c_char,
     package_file: *const c_char,
     module_name: *const c_char,
     range: *const c_char,
-    out_length: *mut usize, // Optional: Pass a pointer to the length
+    out_length: *mut usize,
 ) -> *mut FfiByteArray {
     if endpoint_url.is_null() || package_file.is_null() || module_name.is_null() {
         return std::ptr::null_mut();
@@ -67,25 +83,50 @@ pub extern "C" fn substreams_call_ffi(
 
     match result {
         Ok(results) => {
-            // Allocate memory for FfiByteArray
             let mut ffi_results: Vec<FfiByteArray> = Vec::new();
             for bytes in results {
                 ffi_results.push(FfiByteArray::new(bytes));
             }
 
-            // Store the number of results in `out_length`
             unsafe {
                 if !out_length.is_null() {
                     *out_length = ffi_results.len();
                 }
             }
 
-            // Return the pointer to the FfiByteArray
             Box::into_raw(ffi_results.into_boxed_slice()) as *mut FfiByteArray
         }
-        Err(_) => std::ptr::null_mut(), // Return null on error
+        Err(_) => std::ptr::null_mut(),
     }
 }
+
+// Free a string pointer
+#[no_mangle]
+pub extern "C" fn free_string(ptr: *mut c_char) {
+    if ptr.is_null() {
+        return;
+    }
+    unsafe {
+        let _ = CString::from_raw(ptr); // Safely deallocates the memory
+    }
+}
+
+// Free a byte array
+#[no_mangle]
+pub extern "C" fn free_byte_array(ptr: *mut FfiByteArray, length: usize) {
+    if ptr.is_null() {
+        return;
+    }
+
+    unsafe {
+        let slice = std::slice::from_raw_parts_mut(ptr, length);
+        for array in &mut *slice {
+            let _ = Vec::from_raw_parts(array.data, array.length, array.length);
+        }
+        let _ = Box::from_raw(slice);
+    }
+}
+
 
 
 #[no_mangle]
@@ -177,15 +218,3 @@ pub extern "C" fn api_call_ffi(
 //         Err(err) => CString::new(format!("Error: {}", err)).unwrap().into_raw(),
 //     }
 // }
-
-#[no_mangle]
-pub extern "C" fn free_string(ptr: *mut c_char) {
-    if ptr.is_null() {
-        println!("free_string: Received null pointer, skipping free.");
-        return;
-    }
-    unsafe {
-        println!("free_string: Freeing pointer {:?}", ptr);
-        let _ = CString::from_raw(ptr); // Safely deallocates the memory
-    }
-}
