@@ -41,6 +41,54 @@ lazy_static! {
 }
 
 #[no_mangle]
+pub extern "C" fn substreams_call_ffi(
+    endpoint_url: *const c_char,
+    package_file: *const c_char,
+    module_name: *const c_char,
+    range: *const c_char,
+    out_length: *mut usize, // Optional: Pass a pointer to the length
+) -> *mut FfiByteArray {
+    if endpoint_url.is_null() || package_file.is_null() || module_name.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let endpoint_url = unsafe { CStr::from_ptr(endpoint_url).to_string_lossy().to_string() };
+    let package_file = unsafe { CStr::from_ptr(package_file).to_string_lossy().to_string() };
+    let module_name = unsafe { CStr::from_ptr(module_name).to_string_lossy().to_string() };
+    let range = unsafe {
+        if range.is_null() {
+            None
+        } else {
+            Some(CStr::from_ptr(range).to_string_lossy().to_string())
+        }
+    };
+
+    let result = RUNTIME.block_on(substreams_call(endpoint_url, &package_file, &module_name, range));
+
+    match result {
+        Ok(results) => {
+            // Allocate memory for FfiByteArray
+            let mut ffi_results: Vec<FfiByteArray> = Vec::new();
+            for bytes in results {
+                ffi_results.push(FfiByteArray::new(bytes));
+            }
+
+            // Store the number of results in `out_length`
+            unsafe {
+                if !out_length.is_null() {
+                    *out_length = ffi_results.len();
+                }
+            }
+
+            // Return the pointer to the FfiByteArray
+            Box::into_raw(ffi_results.into_boxed_slice()) as *mut FfiByteArray
+        }
+        Err(_) => std::ptr::null_mut(), // Return null on error
+    }
+}
+
+
+#[no_mangle]
 pub extern "C" fn rpc_call_ffi(
     rpc_endpoint: *const c_char,
     method: *const c_char,
@@ -97,38 +145,38 @@ pub extern "C" fn api_call_ffi(
     }
 }
 
-#[no_mangle]
-pub extern "C" fn substreams_call_ffi(
-    endpoint_url: *const c_char,
-    package_file: *const c_char,
-    module_name: *const c_char,
-    range: *const c_char,
-) -> *mut c_char {
-    if endpoint_url.is_null() || package_file.is_null() || module_name.is_null() {
-        return CString::new("Null pointer passed").unwrap().into_raw();
-    }
+// #[no_mangle]
+// pub extern "C" fn substreams_call_ffi(
+//     endpoint_url: *const c_char,
+//     package_file: *const c_char,
+//     module_name: *const c_char,
+//     range: *const c_char,
+// ) -> *mut c_char {
+//     if endpoint_url.is_null() || package_file.is_null() || module_name.is_null() {
+//         return CString::new("Null pointer passed").unwrap().into_raw();
+//     }
 
-    let endpoint_url = unsafe { CStr::from_ptr(endpoint_url).to_string_lossy().to_string() };
-    let package_file = unsafe { CStr::from_ptr(package_file).to_string_lossy().to_string() };
-    let module_name = unsafe { CStr::from_ptr(module_name).to_string_lossy().to_string() };
-    let range = unsafe {
-        if range.is_null() {
-            None
-        } else {
-            Some(CStr::from_ptr(range).to_string_lossy().to_string())
-        }
-    };
+//     let endpoint_url = unsafe { CStr::from_ptr(endpoint_url).to_string_lossy().to_string() };
+//     let package_file = unsafe { CStr::from_ptr(package_file).to_string_lossy().to_string() };
+//     let module_name = unsafe { CStr::from_ptr(module_name).to_string_lossy().to_string() };
+//     let range = unsafe {
+//         if range.is_null() {
+//             None
+//         } else {
+//             Some(CStr::from_ptr(range).to_string_lossy().to_string())
+//         }
+//     };
 
-    let result = RUNTIME.block_on(substreams_call(endpoint_url, &package_file, &module_name, range));
+//     let result = RUNTIME.block_on(substreams_call(endpoint_url, &package_file, &module_name, range));
 
-    match result {
-        Ok(debug_values) => {
-            let output = format!("{:?}", debug_values);
-            CString::new(output).unwrap().into_raw()
-        }
-        Err(err) => CString::new(format!("Error: {}", err)).unwrap().into_raw(),
-    }
-}
+//     match result {
+//         Ok(debug_values) => {
+//             let output = format!("{:?}", debug_values);
+//             CString::new(output).unwrap().into_raw()
+//         }
+//         Err(err) => CString::new(format!("Error: {}", err)).unwrap().into_raw(),
+//     }
+// }
 
 #[no_mangle]
 pub extern "C" fn free_string(ptr: *mut c_char) {
