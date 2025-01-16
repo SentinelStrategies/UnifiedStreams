@@ -1,5 +1,5 @@
 [package]
-name = "reqstreams"
+name = "unifiedstreams"
 version = "0.1.0"
 edition = "2021"
 
@@ -33,5 +33,5 @@ reqwest = { version = "0.11", features = ["json"] }
 
 [lib]
 crate-type = ["cdylib", "staticlib"]  # Ensures the library builds as a shared library
-name = "reqstreams"       # The name of the library
+name = "unifiedstreams"       # The name of the library
 path = "src/lib.rs"              # Path to the library source file
