@@ -4,7 +4,7 @@ This code contains robust library code for integrating Substreams, RPC, and API 
 ## Compiling the Library
 
 1. **Clone the Repository and Checkout in `main` Branch**  
-   `bash git clone https://github.com/SentinelStrategies/UnifiedStreams.git `
+   `git clone https://github.com/SentinelStrategies/UnifiedStreams.git `
    
 3. **Install Rust and Cargo**
 Ensure you have both the Rust compiler (rustc) and Cargo package manager installed and configured in your system PATH.
