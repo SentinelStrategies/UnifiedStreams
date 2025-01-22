@@ -27,7 +27,9 @@ You can set a JWT token as an environment variable to avoid specifying it for ea
       source ~/.bashrc
 ```
 
-# 2. Import the library in the corresponding language and call the corresponding function from the library to get results.
+2. **Import the library in the corresponding language and call the corresponding function from the library to get output**
+   The output of the substreams_call_ffi function is encoded using Google's Protocol Buffers (Protobuf) format. To interpret this output, you need to decode it using the   .proto schema associated with the corresponding module. The required .proto files can be found in the respective package repository available on the Substreams website.
+   
       rpc_call_ffi
       api_call_ffi
       substreams_call_ffi
