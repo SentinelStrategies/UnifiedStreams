@@ -13,9 +13,7 @@ Ensure you have both the Rust compiler (rustc) and Cargo package manager install
 Make sure OpenSSL and any necessary dependencies are correctly installed and recognized by your system.
 
 5. **Compile**
-
 ```bash cargo build --release ```
-
 This will produce optimized binary artifacts in the target/release directory, including various library files. These files can be integrated into other languages or projects as needed.
 
 ## Usage
