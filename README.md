@@ -8,11 +8,15 @@ This code contains robust library code for integrating Substreams, RPC, and API 
    
 3. **Install Rust and Cargo**
 Ensure you have both the Rust compiler (rustc) and Cargo package manager installed and configured in your system PATH.
+```bash
+      rustc --version
+      cargo --version
+```
 
-4. **Install OpenSSL and Related Dependencies**
+5. **Install OpenSSL and Related Dependencies**
 Make sure OpenSSL and any necessary dependencies are correctly installed and recognized by your system.
 
-5. **Compile**
+6. **Compile**
 `cargo build --release`
 This will produce optimized binary artifacts in the target/release directory, including various library files. These files can be integrated into other languages or projects as needed.
 
