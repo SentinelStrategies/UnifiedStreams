@@ -30,7 +30,7 @@ https://github.com/SentinelStrategies/UnifiedStreams.git
 
 
 # 1. Setup a substreams JWT TOKEN
-You can set a JWT token as an environment variable to avoid specifying it for each session. If you only need it for your current session, simply run the following export command
+You can set a JWT token as an environment variable to avoid specifying it for each session. Replace <jwt_token_here> with your actual token from substreams.
 
 ```bash
       nano ~/.bashrc
@@ -64,7 +64,7 @@ cargo run api_call https://httpbin.org/get
    Usage2: cargo run rpc_call {rpc-url} {method} {params} {id}
 **Example:**
 ```bash
-cargo run rpc_call https://mainnet.infura.io/v3/e2df7af7a38e41d9a7334ce930e566c9 eth_getBalance '["0x3843889b7356e89e63581A594ad826B1F1C445f5", "latest"]' 1 
+cargo run rpc_call https://mainnet.infura.io/v3/<infura_key> eth_getBalance '["0x3843889b7356e89e63581A594ad826B1F1C445f5", "latest"]' 1 
 ```
 
    Usage3: cargo run substreams_call {stream endpoint} {spkg} {module} {start}:{stop}
