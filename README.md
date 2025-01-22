@@ -1,5 +1,5 @@
 ## UnifiedStreams
-This "main" branch contains robust library code for integrating Substreams, RPC, and API calls into your applications. It simplifies real-time data processing, cross-protocol communication, and API integrations. Designed with extensibility, performance, and reliability in mind, it’s perfect for building scalable, multi-protocol systems.
+This code contains robust library code for integrating Substreams, RPC, and API calls into your applications. It simplifies real-time data processing, cross-protocol communication, and API integrations. Designed with extensibility, performance, and reliability in mind, it’s perfect for building scalable, multi-protocol systems.
 
 ## Compiling the Library
 
