@@ -16,9 +16,9 @@ Make sure OpenSSL and any necessary dependencies are correctly installed and rec
 ```bash cargo build --release ```
 This will produce optimized binary artifacts in the target/release directory, including various library files. These files can be integrated into other languages or projects as needed.
 
-## Usage
+# Usage
 
-# 1. Setup a substreams JWT TOKEN
+1. **Setup a substreams JWT TOKEN**
 You can set a JWT token as an environment variable to avoid specifying it for each session. Replace <jwt_token_here> with your actual token from substreams.
 
 ```bash
