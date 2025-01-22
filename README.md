@@ -1,6 +1,6 @@
-# UnifiedStreams (main branch)
-This "main" branch contains a powerful program for seamlessly integrating Substreams, RPC calls, and API calls into your workflows. It simplifies real-time data processing, enhances cross-protocol communication, and streamlines API interactions. Designed with a focus on performance, reliability, and scalability, this program is perfect for building robust, multi-protocol solutions.
-TO use portable library please refer of other branch "lib".
+# UnifiedStreams
+This branch contains a powerful program for seamlessly integrating Substreams, RPC calls, and API calls into your workflows. It simplifies real-time data processing, enhances cross-protocol communication, and streamlines API interactions. Designed with a focus on performance, reliability, and scalability, this program is perfect for building robust, multi-protocol solutions.
+To use the portable library please refer to branch "main".
 
 
 ## Prerequisites
